@@ -293,12 +293,31 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
                         if (flags & BDF_GPL)
                         {
                             printf("\t");
-                            for (i = 0; i < gh; i++)
+                            for (int disp_i = 0; disp_i < displacement; disp_i++)
                             {
-                                if ((i == gh / 2) && (flags & BDF_ROTATE))
-                                    printf("\n\t");
-                                printf("0x%02X,", glyph[i]);
+                                if(gw > 8) {
+                                    printf("0x00, 0x00, ");
+                                }
+                                else {
+                                    printf("0x00, ");
+                                }
                             }
+
+                            if(gw > 8)
+                            {
+                                for (i = 0; i < gh-displacement; i=i+2)
+                                {
+                                    printf("0x%02X, 0x%02X, ", glyph[i], glyph[i+1]);
+                                }
+                            }
+                            else
+                            {
+                                for (i = 0; i < gh-displacement; i++)
+                                {
+                                    printf("0x%02X, ", glyph[i]);
+                                }
+                            }
+
                             printf(" // %5d", idx);
                             if (isprint(idx))
                                 printf(" '%c'", idx);
