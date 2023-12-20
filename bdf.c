@@ -36,7 +36,7 @@
 
 #include "bdf.h"
 
-static char *filename(const char *name)
+const char *filename(const char *name)
 {
 	const char *file = name;
 
