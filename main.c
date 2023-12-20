@@ -35,11 +35,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <libgen.h>
-
 #include "bdf.h"
-#include "li2c.h"
-#include "rterm.h"
-#include "ossd_i2c.h"
 
 #define DISPLAY_FONT 0x80000000
 
