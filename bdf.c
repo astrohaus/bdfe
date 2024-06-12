@@ -304,7 +304,11 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
 
                     // Shift the bitValue based on the bounding box x offset
                     bitValue = bitValue >> bbox;
-                   
+
+                    // Discard anything outside the bounding box
+                    uint32_t mask = (((1 << bbw) - 1) << (bytes * 8 - bbw - bbox));
+                    bitValue = bitValue & mask;
+
                     for(int byte_idx = 0; byte_idx < bytes; byte_idx++) {
                         glyph[i++] = (uint8_t)(bitValue >> ((bytes - byte_idx - 1) * 8));
                     }
