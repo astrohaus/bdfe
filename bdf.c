@@ -127,7 +127,10 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
             dx = strtoul(arg, &arg, 10);
             dy = strtoul(arg, &arg, 10);
             strtoul(arg, &arg, 10);
-            strtoul(arg, &arg, 10);
+            int fbb_oy = strtoul(arg, &arg, 10);
+            // Calculate the ascent based on the bounding box because the font may have
+            // pixels that lie above or below the official ascent/descent values.
+            ascent = dy + fbb_oy;
             // Calculate the number of bytes needed to store a line of the glyph
             bytes = (dx + 7) / 8;
         }
@@ -135,7 +138,9 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
         {
             if (!mute && (flags & BDF_HEADER))
                 printf("// %s\n", buf);
-            ascent = strtoul(arg, &arg, 10);
+            unsigned official_ascent = strtoul(arg, &arg, 10);
+            ascent = official_ascent > ascent ? official_ascent : ascent;
+
         }
         if (key_arg(buf, "FONT_DESCENT", &arg))
         {
