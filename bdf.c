@@ -82,6 +82,7 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
     char buf[BUFSIZ];
     char startchar[BUFSIZ];
     unsigned dx = 0, dy = 0, ascent = 0;
+    unsigned bytes = 0;
 
     if (name == NULL || (fp = fopen(name, "r")) == NULL)
         return 0;
@@ -127,6 +128,8 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
             dy = strtoul(arg, &arg, 10);
             strtoul(arg, &arg, 10);
             strtoul(arg, &arg, 10);
+            // Calculate the number of bytes needed to store a line of the glyph
+            bytes = (dx + 7) / 8;
         }
         if (key_arg(buf, "FONT_ASCENT", &arg))
         {
@@ -153,7 +156,7 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
 
     fseek(fp, 0, SEEK_SET);
 
-    unsigned gsize = (dy * (dx > 8 ? 2 : 1));
+    unsigned gsize = (dy * bytes);
     uint8_t *glyph = (uint8_t *)malloc(gsize);
     memset(glyph, 0, gsize);
 
@@ -212,26 +215,16 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
                             printf("\t");
                             for (int disp_i = 0; disp_i < displacement; disp_i++)
                             {
-                                if(dx > 8) {
-                                    printf("0x00, 0x00, ");
-                                }
-                                else {
+                                for(int byte_idx = 0; byte_idx < bytes; byte_idx++) {
                                     printf("0x00, ");
                                 }
                             }
 
-                            if(dx > 8)
+
+                            for (i = 0; i < (dy-displacement); i++)
                             {
-                                for (i = 0; i < (dy-displacement)*2; i=i+2)
-                                {
-                                    printf("0x%02X, 0x%02X, ", glyph[i], glyph[i+1]);
-                                }
-                            }
-                            else
-                            {
-                                for (i = 0; i < dy-displacement; i++)
-                                {
-                                    printf("0x%02X, ", glyph[i]);
+                                for(int byte_idx = 0; byte_idx < bytes; byte_idx++) {
+                                    printf("0x%02X, ", glyph[(i*bytes)+byte_idx]);
                                 }
                             }
 
@@ -255,12 +248,11 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
 
                             for (int disp_i = 0; disp_i < displacement; disp_i++)
                             {
-                                if(dx > 8) {
-                                    printf(" 0x00, 0x00, //  %2d|", disp_i);
+                                for(int byte_idx = 0; byte_idx < bytes; byte_idx++) {
+                                    printf(" 0x00,");
                                 }
-                                else {
-                                    printf(" 0x00, //  %2d|", disp_i);
-                                }
+                                printf(" //  %2d|", disp_i);
+
                                 for (unsigned bit = 0; bit < dx; bit++)
                                 {
                                     printf(" ");
@@ -270,35 +262,17 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
 
                             for (i = 0; i < (dy - displacement); i++)
                             {
-                                uint16_t word = 0x0000;
-                                if(dx > 8) {
-                                    word = (glyph[0 + (i * 2)] << 8) | glyph[1 + (i * 2)];
+                                for(int byte_idx = 0; byte_idx < bytes; byte_idx++) {
+                                    printf(" 0x%02X,", glyph[(i*bytes)+byte_idx]);
                                 }
-                                else {
-                                    word = glyph[i];
-                                }
-                                // printf(" 0x%02X //  %2d|", gout[i], i);
-                                if(dx > 8) {
-                                    printf(" 0x%02X, 0x%02X, //  %2d|", (uint8_t)(word >> 8), (uint8_t)(word), (i+displacement));
-                                }
-                                else {
-                                    printf(" 0x%02X, //  %2d|", (uint8_t)(word), (i+displacement));
-                                }
-                                // printf(" 0x%02X, 0x%02X, //  %2d|", (uint8_t)(word), (uint8_t)(word >> 8), (i+displacement));
-                                for (unsigned bit = 0; bit < dx; bit++)
-                                {
-                                    if (dx > 8)
-                                    {
-                                        printf("%c", (word & (0x8000 >> bit)) ? '#' : ' ');
-                                    }
-                                    else
-                                    {
-                                        if (word & (0x80 >> bit))
-                                            printf("#");
-                                        else
-                                            printf(" ");
+                                printf(" //  %2d|", i+displacement);
+
+                                for(int byte_idx = 0; byte_idx < bytes; byte_idx++) {
+                                    for(int bit = 0; bit < 8; bit++) {
+                                        printf("%c", (glyph[(i*bytes)+byte_idx] & (0x80 >> bit)) ? '#' : ' ');
                                     }
                                 }
+
                                 printf("|\n");
                             }
                             printf("\n");
@@ -316,20 +290,18 @@ int bdf_convert(const char *name, unsigned gmin, unsigned gmax, unsigned ascende
                 if (bitmap && (i < gsize))
                 {
                     uint8_t valCharCount = strlen(buf);
-                    uint16_t bitValue = strtoul(buf, NULL, 16);
+                    uint32_t bitValue = strtoul(buf, NULL, 16);
                     (void)bbw;
+                   
+                    // Align the bitValue to the left
+                    uint8_t left_shift = (bytes - (valCharCount / 2)) * 8;
+                    bitValue = bitValue << left_shift;
 
-                    if(dx > 8) {
-                        if(valCharCount <= 2) {
-                            bitValue = bitValue << 8;
-                        }
-                        bitValue = bitValue >> bbox;
-
-                        glyph[i++] = (uint8_t)(bitValue >> 8);
-                        glyph[i++] = (uint8_t)(bitValue);
-                    } else {
-                        bitValue = bitValue >> bbox;
-                        glyph[i++] = (uint8_t)(bitValue);
+                    // Shift the bitValue based on the bounding box x offset
+                    bitValue = bitValue >> bbox;
+                   
+                    for(int byte_idx = 0; byte_idx < bytes; byte_idx++) {
+                        glyph[i++] = (uint8_t)(bitValue >> ((bytes - byte_idx - 1) * 8));
                     }
                 }
             }
